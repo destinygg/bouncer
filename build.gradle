@@ -20,7 +20,7 @@ repositories {
   maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
 }
 
-version = "0.1.0"
+version = "0.1.1"
 group= "gg.destiny.bouncer"
 archivesBaseName = "bouncer"
 

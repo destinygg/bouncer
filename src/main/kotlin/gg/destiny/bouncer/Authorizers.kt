@@ -37,12 +37,14 @@ class DggAuthorizer(val secret: String, val gson: Gson  = Gson()) : Authorizer {
                          @Query("name") playerName: String): Observable<Response<String>>
   }
 
+  data class Authorization(val subscriberName: String, var subscriptionExpiration: Long, var lastCheck: Long)
+
   private val endpoints: Endpoints
   private val authorizationCache = CacheBuilder.newBuilder()
     .concurrencyLevel(16)
     .maximumSize(1000)
     .expireAfterWrite(24, TimeUnit.HOURS)
-    .build<UUID, String>()
+    .build<UUID, Authorization>()
 
   init {
     val retrofit = Retrofit.Builder()
@@ -54,18 +56,32 @@ class DggAuthorizer(val secret: String, val gson: Gson  = Gson()) : Authorizer {
   }
 
   override fun authorize(playerId: UUID, playerName: String): Single<String> {
-    val cachedName = authorizationCache.getIfPresent(playerId)
-    if (cachedName != null) {
-      return Single.just(cachedName)
+    val now = System.currentTimeMillis()
+    val cachedAuthorization = authorizationCache.getIfPresent(playerId)
+    cachedAuthorization?.let {
+      if (it.lastCheck + TimeUnit.HOURS.toMillis(1) < now || it.subscriptionExpiration < now) {
+        return endpoints.authenticate(secret, playerId)
+          .map { response ->
+            if (!response.isSuccessful) {
+              authorizationCache.invalidate(playerId)
+              throw Authorizer.AuthFailedException()
+            }
+
+            // Update the cache
+            val authResponse = gson.fromJson(response.body(), Endpoints.AuthenticationResponse::class.java)
+            it.subscriptionExpiration = authResponse.end
+            it.lastCheck = now
+            authorizationCache.put(playerId, it)
+
+            return@map it.subscriberName
+          }
+          .toSingle()
+      } else {
+        return Single.just(it.subscriberName)
+      }
     }
 
-    return endpoints.authenticate(secret, playerId)
-      .map { response ->
-        if (!response.isSuccessful) {
-          throw Authorizer.AuthFailedException()
-        }
-      }
-      .flatMap { endpoints.retrieveChatName(secret, playerId, playerName) }
+    return endpoints.retrieveChatName(secret, playerId, playerName)
       .map { response ->
         if (!response.isSuccessful) {
           throw Authorizer.AuthFailedException()
@@ -73,13 +89,13 @@ class DggAuthorizer(val secret: String, val gson: Gson  = Gson()) : Authorizer {
 
         val chatnameResponse = gson.fromJson(response.body(), Endpoints.ChatnameResponse::class.java)
         val end = chatnameResponse.end
-        if (end < System.currentTimeMillis()) {
+        if (end < now) {
           // Expired subscription
           throw Authorizer.AuthFailedException()
         }
 
         val subNick = chatnameResponse.nick
-        authorizationCache.put(playerId, subNick)
+        authorizationCache.put(playerId, Authorization(subNick, end, now))
         return@map subNick
       }
       .toSingle()

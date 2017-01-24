@@ -2,7 +2,7 @@
   "modid": "bouncer",
   "name": "Destiny.gg Bouncer",
   "description": "A bouncer for the Destiny.gg minecraft server, denying entry to non-subscribers.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "mcversion": "1.10.2",
   "url": "destiny.gg",
   "authorList": ["Xiphirx"]
