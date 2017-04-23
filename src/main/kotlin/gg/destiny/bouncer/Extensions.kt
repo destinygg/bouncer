@@ -1,12 +1,8 @@
 package gg.destiny.bouncer
 
-import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.server.MinecraftServer
-import net.minecraft.util.ChatComponentText
+import net.minecraft.util.text.TextComponentString
 
 fun MinecraftServer.broadcastChatMessage(message: String) {
-  configurationManager.playerEntityList.forEach {
-    it as? EntityPlayer ?: return@forEach
-    it.addChatMessage(ChatComponentText(message))
-  }
+  playerList.sendMessage(TextComponentString(message))
 }

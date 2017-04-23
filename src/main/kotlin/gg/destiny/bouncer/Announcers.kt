@@ -1,6 +1,6 @@
 package gg.destiny.bouncer
 
-import net.minecraft.util.EnumChatFormatting.*
+import net.minecraft.util.text.TextFormatting.*
 
 interface Announcer {
   fun announceTrusted(playerName: String): String
